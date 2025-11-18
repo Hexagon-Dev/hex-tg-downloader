@@ -27,7 +27,7 @@ async function downloadFile(url, filename) {
 export async function parseInstagramUrl(url) {
   const response = await snapsave.default(url);
 
-  if (!response.data[0].url) {
+  if (!response.data.length || !response.data[0].url) {
     throw new Error('Failed to fetch Instagram URL - not available.');
   }
 
