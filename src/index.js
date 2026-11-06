@@ -10,7 +10,23 @@ import { parseInstagramUrl, validateInstagramURL } from './instagram.js';
 
 config();
 
-const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN ?? '', { polling: true });
+// Stop after the first matching onText handler (default false runs every matching regexp).
+const bot = new TelegramBot(process.env.TELEGRAM_BOT_TOKEN ?? '', {
+  polling: true,
+  onlyFirstMatch: true,
+});
+
+bot.on('message', (msg) => {
+  if (!isAnalyticsEnabled() || !msg.text) {
+    return;
+  }
+
+  try {
+    insertMessage({ id: msg.message_id, chat: msg.chat, user: msg.from, text: msg.text, created_at: msg.date });
+  } catch (error) {
+    console.error('Failed to insert message:', error);
+  }
+});
 
 async function handleTikTokCommand(msg, match) {
   const chatId = msg.chat.id;
@@ -90,34 +106,6 @@ async function handleYoutubeCommand(msg, match) {
     await bot.sendMessage(chatId, `Failed sending video: ${err.message}`);
   }
 }
-
-bot.onText(/(\S+)/, async (msg, match) => {
-  if (isAnalyticsEnabled()) {
-    try {
-      insertMessage({ id: msg.message_id, chat: msg.chat, user: msg.from, text: msg.text, created_at: msg.date });
-    } catch (error) {
-      console.error('Failed to insert message:', error);
-    }
-  }
-
-  if (msg.chat.type !== 'private' || match?.at(1)?.startsWith('/')) {
-    return;
-  }
-
-  const url = match?.at(1) ?? '';
-
-  if (url.includes('tiktok.com')) {
-    await handleTikTokCommand(msg, match);
-  } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    await handleYoutubeCommand(msg, match);
-  } else if (url.includes('x.com')) {
-    await handleTwitterCommand(msg, match);
-  } else if (url.includes('instagram.com')) {
-    await handleInstagramCommand(msg, match);
-  } else {
-    await bot.sendMessage(msg.chat.id, 'Send link or use command to interact with bot.')
-  }
-});
 
 bot.onText(/\/tt (\S+)/, handleTikTokCommand);
 
@@ -229,5 +217,26 @@ Last messages:\n` +
     await bot.sendMessage(chatId, 'Failed to get stats.');
 
     return;
+  }
+});
+
+/** Private chat: bare URL as first token (commands are handled by matchers above). */
+bot.onText(/^(\S+)/, async (msg, match) => {
+  if (msg.chat.type !== 'private' || match?.at(1)?.startsWith('/')) {
+    return;
+  }
+
+  const url = match?.at(1) ?? '';
+
+  if (url.includes('tiktok.com')) {
+    await handleTikTokCommand(msg, match);
+  } else if (url.includes('youtube.com') || url.includes('youtu.be')) {
+    await handleYoutubeCommand(msg, match);
+  } else if (url.includes('x.com')) {
+    await handleTwitterCommand(msg, match);
+  } else if (url.includes('instagram.com')) {
+    await handleInstagramCommand(msg, match);
+  } else {
+    await bot.sendMessage(msg.chat.id, 'Send link or use command to interact with bot.')
   }
 });
