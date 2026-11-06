@@ -91,19 +91,15 @@ async function handleYoutubeCommand(msg, match) {
   }
 }
 
-bot.onText(/(.+)/, async (msg) => {
-  if (!isAnalyticsEnabled()) {
-    return;
-  }
-
-  try {
-    insertMessage({ id: msg.message_id, chat: msg.chat, user: msg.from, text: msg.text, created_at: msg.date });
-  } catch (error) {
-    console.error('Failed to insert message:', error);
-  }
-});
-
 bot.onText(/(\S+)/, async (msg, match) => {
+  if (isAnalyticsEnabled()) {
+    try {
+      insertMessage({ id: msg.message_id, chat: msg.chat, user: msg.from, text: msg.text, created_at: msg.date });
+    } catch (error) {
+      console.error('Failed to insert message:', error);
+    }
+  }
+
   if (msg.chat.type !== 'private' || match?.at(1)?.startsWith('/')) {
     return;
   }
